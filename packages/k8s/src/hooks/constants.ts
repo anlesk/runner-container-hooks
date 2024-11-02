@@ -1,5 +1,7 @@
 import { v4 as uuidv4 } from 'uuid'
 
+export const RUNNER_WORKSPACE = process.env['RUNNER_WORKSPACE'];
+
 export function getRunnerPodName(): string {
   const name = process.env.ACTIONS_RUNNER_POD_NAME
   if (!name) {

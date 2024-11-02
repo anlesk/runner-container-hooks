@@ -26,7 +26,8 @@ import {
   PodPhase,
   fixArgs
 } from '../k8s/utils'
-import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME } from './constants'
+import { CONTAINER_EXTENSION_PREFIX, JOB_CONTAINER_NAME, RUNNER_WORKSPACE } from './constants'
+import { existsSync, readFileSync } from 'fs'
 
 export async function prepareJob(
   args: PrepareJobArgs,
@@ -177,14 +178,27 @@ function generateResponseFile(
   writeToResponseFile(responseFile, JSON.stringify(response))
 }
 
+/**
+ * Copies externals from runner to shared volume usable by tasks. Target directory /tmp/externals is mapped in runner creation in autoscaler app
+ */
 async function copyExternalsToRoot(): Promise<void> {
-  const workspace = process.env['RUNNER_WORKSPACE']
+  const workspace = RUNNER_WORKSPACE
   if (workspace) {
-    await io.cp(
-      path.join(workspace, '../../externals'),
-      path.join(workspace, '../externals'),
-      { force: true, recursive: true, copySourceDirectory: false }
-    )
+    if (
+      existsSync(path.join(workspace, '../../externals/externals.sum'))
+      && existsSync('/tmp/externals/externals.sum')
+      && readFileSync(path.join(workspace, '../../externals/externals.sum'), 'utf8') === readFileSync('/tmp/externals/externals.sum', 'utf8')
+    ) {
+      core.info('Provided externals version already exists at target, no need to copy');
+    } else {
+      core.debug('Copying externals');
+      // We need server binary at new job, so have to wait here
+      await io.cp(
+        path.join(workspace, '../../externals'),
+        '/tmp/externals',
+        { force: true, recursive: true, copySourceDirectory: false }
+      )
+    }
   }
 }
 
